@@ -38,7 +38,7 @@
 \section{Blockchain}
 Blockchain é um livro-razão (ledger) de transações imutáveis, mantido dentro de uma rede distribuída de nós pares (peers). Esses nós mantêm uma cópia do livro (ledger), aplicando transações que foram validadas por um protocolo de consenso, agrupadas em blocos que incluem um hash que liga cada bloco ao bloco anterior.
 
-Na Figura 1, faço uma analogia com um trem para facilitar o entendimento de uma cadeia de blocos. Primeiro teremos a cabine do trem, ela será nosso bloco genesis, agora perceba que a cada estção em que o trem vai passando é adicionado um novo vagão. Cada vagão adicionado será de forma analoga um novo bloco e cada estação será a conclusão de um trabalho e assim vai formando uma cadeia onde todos os vagões ou blocos estarão interligados. 
+Na Figura 1, faço uma analogia com um trem para facilitar o entendimento de uma cadeia de blocos. Primeiro teremos a cabine do trem, ela será nosso bloco genesis, agora perceba que a cada estção em que o trem vai passando é registrado e adicionado um novo vagão. Cada vagão adicionado será de forma analoga um novo bloco e cada estação será a conclusão de um trabalho e o registro no livro-razão (ledger) e assim vai formando uma cadeia onde todos os vagões ou blocos estarão interligados.
 \begin{figure}[H]
 	\centering
 	\includegraphics[width=1.0\textwidth]{imagens/conceito-blocos-trem.png}
@@ -46,7 +46,18 @@ Na Figura 1, faço uma analogia com um trem para facilitar o entendimento de uma
 \end{figure}
 
 \subsection{Origen do Blockchain}
+Apesar de ter seu surgimento vinculado ao do Bitcoin\cite{bitcoin} em 2008, o conceito teve origen bem antes, nos anos 90 em trabalho realizado por Stuart Haber\cite{staurthaber} e W. Scott Stornetta\cite{scottstornetta} chamado \itshape How to Time-Stamp a Digital Document\cite{criadoresblockchain} \normalshape.
+
 \subsection{Algoritmos de Consenso}
+Um algoritmo de consenso é um mecanismo que visa garantir que os participantes de uma rede cheguem em um acordo sobre uma única fonte de verdade, mesmo que ocorram falhas em alguns dos nós participantes.
+
+Existem diferentes tipos de algoritmos de consenso, falarei mais sobre eles no futuro, porém aqui irei citar apenas os três mais conhecidos em minha opinião, que são:
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.6\textwidth]{imagens/algoritmos-consenso.png}
+	\caption{Os três algoritmos de consenso mais conhecidos}
+\end{figure}
+
 
 \section{Hyperledger}
 Hyperledger\cite{hyperledger} é uma comunidade de código aberto "estabelecida sob a Linux Foundation\cite{linuxfoundation}, que tem uma história longa e muito bem-sucedida de nutrir projetos de código aberto sob uma governança aberta que desenvolve comunidades sustentáveis e ecossistemas prósperos" focada no desenvolvimento de um conjunto de estruturas, ferramentas e bibliotecas para implantação de blockchain em nível corporativo.
@@ -60,10 +71,71 @@ Hyperledger Fabric\cite{hyperledgerfabric} é uma plataforma do tipo DLT (Distri
 \end{figure}
 
 \subsection{Criando sua primeira rede Blockchain}
+Depois de contextualizarmos sobre o universo Blockchain é chega a hora de partimos para prática.
+
+\begin{lstlisting}[language=bash]
+# Oba!! Prática!! 
+$ echo "Vamos nessa!"
+\end{lstlisting}
+
+A topologia de nossa rede ficará assim:
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.7\textwidth]{imagens/primeira-rede.png}
+	\caption{Topologia da nossa primeira rede}
+\end{figure}
+
 \subsubsection{Pré-requisitos}
+Para facilitar, disponibilizei os comandos necessários para configurar o ambiente de desenvolvimento no meu GitHub\cite{configuracaodeambiente}, mas recomendo fortemente que acesse pré-requisitos\cite{prerequisitos} para se familiarizar com os requisitos básicos para rodar uma rede Hyperledger Fabric.
+
+\begin{lstlisting}
+  Notas: Este post baseia-se em ambiente Linux (Ubuntu 18.04).
+\end{lstlisting}
+
 \subsubsection{Definindo diretório de trabalho}
+Vale lembra que os diretórios utilizados para armazenar os binários e arquivos de configuração da rede a seguir não é uma imposição, você pode definir outros caminhos caso deseje, porém será necessário alterar os comandos aqui demonstrados.
+
+\begin{lstlisting}
+$ sudo mkdir -p /opt/blockchain/hyperledger/
+$ sudo chown -R aluno:aluno /opt/blockchain
+
+$ cd /opt/blockchain/hyperledger/
+\end{lstlisting}
+
 \subsubsection{Baixando Imagens Hyperledger Fabric}
+\begin{lstlisting}
+# Certifique que esteja no diretório correto
+$ cd /opt/blockchain/hyperledger
+
+$ curl -sSL http://bit.ly/2ysbOFE | bash -s 1.4.0
+
+# Verifique que após conclusão será criado diretório fabric-samples
+ls -l
+
+# Para verificar o conteúdo
+cd fabric-samples && ls -l
+\end{lstlisting}
+
 \subsubsection{Iniciando a rede}
+Neste post iremos realizar todos os passos manualmente, é interessante para melhor entendimento dos binários do Fabric.
+
+Baixar aquivos de configuração:
+\begin{lstlisting}
+# Certifique que esteja no diretório correto
+$ cd /opt/blockchain/hyperledger/fabric-samples
+
+# Clonando arquivos de configuracoes
+$ git clone -b feature/lab-1 https://github.com/deusimarferreira/hyperledger-fabric.git network
+
+# Acessando diretório dos arquivos
+$ cd network
+
+
+# Variáveis de ambiente
+$ export PATH=$GOPATH/src/github.com/hyperledger/fabric/build/bin:${PWD}/../bin:${PWD}:$PATH
+$ export FABRIC_CFG_PATH=${PWD}
+$ export CHANNEL_NAME=villalabs-channel
+\end{lstlisting}
 
 \section{Conclusão}
 
@@ -85,6 +157,31 @@ Hyperledger Fabric\cite{hyperledgerfabric} é uma plataforma do tipo DLT (Distri
   \bibitem{hyperledgerfabric} 
   Hyperledger Fabric \\
   \url{https://www.hyperledger.org/use/fabric}
+
+  \bibitem{staurthaber}
+  Staurt Haber
+  \url(https://www.linkedin.com/in/stuart-haber/)
+
+  \bibitem{scottstornetta}
+  W. Scott Stornetta \\
+  \url(https://www.linkedin.com/in/w-scott-stornetta-25186120/)
+
+  \bibitem{criadoresblockchain}
+  How to Time-Stamp a Digital Document \\
+  \url{https://link.springer.com/chapter/10.1007%2F3-540-38424-3_32}
+
+  \bibitem{bitcoin}
+  Bitcoin White paper \\
+  \url{https://bitcoin.org/en/bitcoin-paper}
+
+  \bibitem{configuracaodeambiente}
+  Configurações de Ambiente \\
+  \url{https://github.com/deusimarferreira/hyperledger-fabric/blob/master/environment.md}
+  \url{https://bitcoin.org/en/bitcoin-paper}
+
+  \bibitem{prerequisitos}
+  Pré-requisitos \\
+  \url{https://hyperledger-fabric.readthedocs.io/en/release-1.4/prereqs.html}
 
   \input{../sty/referencias.tex}
 \end{thebibliography}
