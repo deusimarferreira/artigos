@@ -395,16 +395,16 @@ Todo \textit{peer} na rede deve possuir uma cópia do \textit{ledger} e um \text
 Adicione as variáveis de ambiente nas configurações dos \textit{peer's} (\textit{peer0} e \textit{peer1}).
 \begin{lstlisting}
 # Peer0
-CORE\_LEDGER\_STATE\_STATEDATABASE=CouchDB
-CORE\_LEDGER\_STATE\_COUCHDBCONFIG\_COUCHDBADDRESS=couchdb.peer0.org1.villalabs.co:5984
-CORE\_LEDGER\_STATE\_COUCHDBCONFIG\_USERNAME=peer0.org1
-CORE\_LEDGER\_STATE\_COUCHDBCONFIG\_PASSWORD=password
+CORE_LEDGER_STATE_STATEDATABASE=CouchDB
+CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdb.peer0.org1.villalabs.co:5984
+CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=peer0.org1
+CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=password
 
 # Peer1
-CORE\_LEDGER\_STATE\_STATEDATABASE=CouchDB
-CORE\_LEDGER\_STATE\_COUCHDBCONFIG\_COUCHDBADDRESS=couchdb.peer1.org1.villalabs.co:5984
-CORE\_LEDGER\_STATE\_COUCHDBCONFIG\_USERNAME=peer1.org1
-CORE\_LEDGER\_STATE\_COUCHDBCONFIG\_PASSWORD=password
+CORE_LEDGER_STATE_STATEDATABASE=CouchDB
+CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdb.peer1.org1.villalabs.co:5984
+CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=peer1.org1
+CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=password
 \end{lstlisting}
 
 \textbf{services:} - Nos services vamos adicionar as configuração dos dois bancos de estado:
@@ -458,7 +458,53 @@ $ curl http://localhost:5984
 $ curl http://localhost:6984
 \end{lstlisting}
 
-Como mudamos de base de dados iremos precisar atualizar os \textit{peer's}.
+Como mudamos de base de dados iremos precisar atualizar os \textit{peer's}:
+\begin{lstlisting}
+# PEER0
+# Primeiro vamos fazer um fetch do genesis block para o corrente channel
+$ docker exec \
+    -e "CORE_PEER_LOCALMSPID=Org1MSP" \
+    -e "CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/msp/users/Admin@org1.villalabs.co/msp" peer0.org1.villalabs.co \
+    peer channel fetch oldest $CHANNEL_NAME.block -c $CHANNEL_NAME \
+    --orderer orderer.villalabs.co:7050
+
+# Segundo, vamos executar um join
+$ docker exec \
+    -e "CORE_PEER_LOCALMSPID=Org1MSP" \
+    -e "CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/msp/users/Admin@org1.villalabs.co/msp" peer0.org1.villalabs.co \
+    peer channel join -b $CHANNEL_NAME.block
+
+# PEER1
+# Primeiro vamos fazer um fetch do genesis block para o corrente channel
+$ docker exec \
+    -e "CORE_PEER_LOCALMSPID=Org1MSP" \
+    -e "CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/msp/users/Admin@org1.villalabs.co/msp" peer1.org1.villalabs.co \
+    peer channel fetch oldest $CHANNEL_NAME.block -c $CHANNEL_NAME \
+    --orderer orderer.villalabs.co:7050
+
+# Segundo, vamos executar um join
+$ docker exec \
+    -e "CORE_PEER_LOCALMSPID=Org1MSP" \
+    -e "CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/msp/users/Admin@org1.villalabs.co/msp" peer1.org1.villalabs.co \
+    peer channel join -b $CHANNEL_NAME.block
+\end{lstlisting}
+
+Que tal usar o comando \textit{peer channel list} para verificar o canal recém criado.
+\begin{lstlisting}
+# PEER0
+# Verificar o canal
+$ docker exec \
+    -e "CORE_PEER_LOCALMSPID=Org1MSP" \
+    -e "CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/msp/users/Admin@org1.villalabs.co/msp" peer0.org1.villalabs.co \
+    peer channel list
+
+# PEER1
+# Verificar o canal
+$ docker exec \
+    -e "CORE_PEER_LOCALMSPID=Org1MSP" \
+    -e "CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/msp/users/Admin@org1.villalabs.co/msp" peer1.org1.villalabs.co \
+    peer channel list
+\end{lstlisting}
 
 \section{Conclusão}
 Ne artigo tivemos a oportunidade de conhecer um pouco mais sobre a tecnologia Blockchain e ainda criar uma rede na prática usando a ferramenta Hyperledger\cite{hyperledger} Fabric\cite{hyperledgerfabric}. 
