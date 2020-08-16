@@ -99,45 +99,155 @@ Vale lembra que os diretórios utilizados para armazenar os binários e arquivos
 $ sudo mkdir -p /opt/blockchain/hyperledger/
 $ sudo chown -R aluno:aluno /opt/blockchain
 
+# Certifique que esteja no diretório correto
 $ cd /opt/blockchain/hyperledger/
 \end{lstlisting}
 
 \subsubsection{Baixando Imagens Hyperledger Fabric}
-\begin{lstlisting}
-# Certifique que esteja no diretório correto
-$ cd /opt/blockchain/hyperledger
+Vamos usar os comandos abaixo para baixar as imagens docker\cite{docker} e os binários necessários para criar a cadeia de certificados e os demais artefatos necessários para configurar a rede Hyperledger\cite{hyperledger} Fabric\cite{hyperledgerfabric}.
 
+\begin{lstlisting}
 $ curl -sSL http://bit.ly/2ysbOFE | bash -s 1.4.0
 
-# Verifique que após conclusão será criado diretório fabric-samples
-ls -l
-
-# Para verificar o conteúdo
-cd fabric-samples && ls -l
+# Após conclusão será criado diretório fabric-samples
+$ tree -L 2
 \end{lstlisting}
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.7\textwidth]{imagens/path-fabric-samples.png}
+	\caption{Estrutura do diretório fabric-samples}
+\end{figure}
 
-\subsubsection{Iniciando a rede}
-Neste post iremos realizar todos os passos manualmente, é interessante para melhor entendimento dos binários do Fabric.
+\subsubsection{Entendendo os binários Fabric\cite{hyperledgerfabric}}
+Agora vamos enteder um pouco dos binários Fabric\cite{hyperledgerfabric} enquanto fazemos a geração dos artefatos para nossa rede.
 
-Baixar aquivos de configuração:
 \begin{lstlisting}
-# Certifique que esteja no diretório correto
-$ cd /opt/blockchain/hyperledger/fabric-samples
-
 # Clonando arquivos de configuracoes
 $ git clone -b feature/lab-1 https://github.com/deusimarferreira/hyperledger-fabric.git network
 
 # Acessando diretório dos arquivos
 $ cd network
 
-
 # Variáveis de ambiente
-$ export PATH=$GOPATH/src/github.com/hyperledger/fabric/build/bin:${PWD}/../bin:${PWD}:$PATH
+$ export PATH=$GOPATH/src/github.com/hyperledger/fabric/build/bin:${PWD}/../fabric-samples/bin:${PWD}:$PATH
 $ export FABRIC_CFG_PATH=${PWD}
 $ export CHANNEL_NAME=villalabs-channel
 \end{lstlisting}
 
+O primeiro binário que iremos usar será o \textit{cryptogen}, ele é responsável por gerar a cadeia de certificados Hyperledger\cite{hyperledger} Fabrica\cite{hyperledgerfabric} CA (Certificate Authority). Esse binário depende das configurações contidas no arquivo \textit{crypto-config.yaml} e, após execução gera os artefatos no diretório \textit{crypto-config}.
+\begin{lstlisting}
+# Crie os diretórios crypto-config e channel-artifacts  
+$ mkdir crypto-config channel-artifacts
+
+# Agora vamos gerar a cadeia de certificados para CA
+$ cryptogen generate --config=./crypto-config.yaml
+\end{lstlisting}
+
+O segundo binário que iremos usar será o \textit{configtxgen}, ele é responsável por gerar os artefatos de pré-configuração da rede Hyperledger\cite{hyperledger} Fabrica\cite{hyperledgerfabric}. Esse binário depende das configurações contidas no arquivo \textit{configtx.yaml} e, após execução gerar os artefatos de configuração do canal no diretório \textit{channel-artifacts}.
+\begin{lstlisting}
+# Gera o bloco genesis
+$ configtxgen -profile OrgsOrdererGenesis -outputBlock ./channel-artifacts/genesis.block
+
+#
+$ configtxgen -profile OrgsChannel -outputCreateChannelTx ./channel-artifacts/channel.tx -channelID $CHANNEL_NAME
+
+#
+$ configtxgen -profile OrgsChannel -outputAnchorPeersUpdate ./channel-artifacts/Org1MSPanchors.tx -channelID $CHANNEL_NAME -asOrg Org1MSP
+\end{lstlisting}
+
+\subsubsection{Iniciando nossa rede com docker-compose}
+Agora estamos perto de finalizar a criação de nossa rede, mas antes de executar o \textit{docker-compose} precisamos atualizar a variável de ambiente FABRIC\_CA\_SERVER\_CA\_KEYFILE para a nova chave criada quando executamos o comanto \textit{cryptogen generate --config=./crypto-config.yaml}.
+
+\begin{lstlisting}
+# Comando para identificar a chave
+$ ls -la crypto-config/peerOrganizations/org1.villalabs.co/ca/
+\end{lstlisting}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=1.1\textwidth]{imagens/env-key.png}
+  \caption{Saída do comando ls -la}
+\end{figure}
+
+\begin{lstlisting}
+# Comando para alterar o docker-compose e incluir a chave 
+$ vim docker-compose.yaml
+\end{lstlisting}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=1.1\textwidth]{imagens/env-key-compose.png}
+  \caption{docker-compose.yaml}
+\end{figure}
+
+\begin{lstlisting}
+# Para e limpa todos os containers existentes
+$ docker-compose -f docker-compose.yaml down
+
+# Sobre containers
+$ docker-compose -f docker-compose.yaml up -d
+\end{lstlisting}
+
+Pronto! Após executar o docker-compose, em caso de sucesso veremos o seguinte resultado.
+\begin{lstlisting}
+# Execute esse comando para verificar os contêineres criados
+$ docker ps --format "table {{.ID}}\t{{.Image}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}"
+\end{lstlisting}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=1.1\textwidth]{imagens/conteineres.png}
+  \caption{Contêineres criados}
+\end{figure}
+
+\subsubsection{Criando canal (channel)}
+O teceiro binário tratado até aqui é \textit{peer}, ele é utilizado para administrar o parceiro/par (peer), como cria um canal (channel), implantar um chaincode e etc..
+
+\begin{lstlisting}
+# Cria o canal (channel)
+$ docker exec \
+    -e "CORE_PEER_LOCALMSPID=Org1MSP" \
+    -e "CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/msp/users/Admin@org1.villalabs.co/msp" peer0.org1.villalabs.co \
+    peer channel create -o orderer.villalabs.co:7050 -c $CHANNEL_NAME -f /etc/hyperledger/configtx/channel.tx
+\end{lstlisting}
+
+Saída do comando:
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=1.1\textwidth]{imagens/criando-canal.png}
+  \caption{Canal criado}
+\end{figure}
+
+\begin{lstlisting}
+# Uni o novo canal (channel) criado
+$ docker exec \
+    -e "CORE_PEER_LOCALMSPID=Org1MSP" \
+    -e "CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/msp/users/Admin@org1.villalabs.co/msp" peer0.org1.villalabs.co \
+    peer channel join -b $CHANNEL_NAME.block
+\end{lstlisting}
+
+Saída do comando:
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=1.1\textwidth]{imagens/join-canal.png}
+  \caption{Unindo canal}
+\end{figure}
+
+Que tal usar o comando \textit{peer channel list} para verificar o canal recém criado.
+\begin{lstlisting}
+# Verificar o canal criado
+$ docker exec \
+    -e "CORE_PEER_LOCALMSPID=Org1MSP" \
+    -e "CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/msp/users/Admin@org1.villalabs.co/msp" peer0.org1.villalabs.co \
+    peer channel list
+\end{lstlisting}
+
+Saída do comando:
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=1.1\textwidth]{imagens/lista-canal.png}
+  \caption{Canal criado}
+\end{figure}
+
 \section{Conclusão}
+Ne artigo tivemos a oportunidade de conhecer um pouco mais sobre a tecnologia Blockchain e ainda criar uma rede na prática usando a ferramenta Hyperledger\cite{hyperledger} Fabric\cite{hyperledgerfabric}. 
 
 \section{Sobre o autor}
 \input{../sty/autor.tex}
@@ -182,6 +292,10 @@ $ export CHANNEL_NAME=villalabs-channel
   \bibitem{prerequisitos}
   Pré-requisitos \\
   \url{https://hyperledger-fabric.readthedocs.io/en/release-1.4/prereqs.html}
+  
+  \bibitem{docker}
+  Docker \\
+  \url{https://www.docker.com/}
 
   \input{../sty/referencias.tex}
 \end{thebibliography}
