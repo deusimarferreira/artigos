@@ -2,7 +2,7 @@
 
 % Identificação
 \newcommand{\pbtitulo}{Hyperledger Fabric}
-\newcommand{\pbversao}{1.0}
+\newcommand{\pbversao}{1.1}
 
 \usepackage{../sty/tutorial}
 
@@ -245,6 +245,220 @@ Saída do comando:
   \includegraphics[width=1.1\textwidth]{imagens/lista-canal.png}
   \caption{Canal criado}
 \end{figure}
+
+\subsection{Vamos adicionar um novo \textit{peer}}
+Até aqui construímos uma rede simples com apenas uma oranização e um peer, mas quando falamos em rede distribuída pensamos em algo maior com várias organizações e peer's. O que tenho a dizer por enquanto é ``muita hora nessa calma, rss'', chegaremos lá.
+
+Nosso próximo passo será adicionar um novo \textit{peer} em nossa \textit{Org1}.
+
+Altere o arquivo \textit{docker-compose.yaml} para adicionar as configurações necessárias para criar o contêiner para o novo \texttt{peer}.
+
+Serão duas alterações necessárias, a primeira nas definições de \textbf{volumes:} e a segunda nos \textbf{services:}.
+
+\textbf{volumes:} - Em volumes adicione o volume para o peer1 (peer1.org1.villalabs.co):
+\begin{lstlisting}
+volumes:
+  ca.villalabs.co:
+  orderer.villalabs.co:
+  peer0.org1.villalabs.co:
+  peer1.org1.villalabs.co:
+\end{lstlisting}
+
+\textbf{services:} - Nos services vamos adicionar as configuração abaixo do \textbf{peer0.org1.villalabs.co}:
+\begin{lstlisting}
+  peer1.org1.villalabs.co:
+    container_name: peer1.org1.villalabs.co
+    image: hyperledger/fabric-peer
+    environment:
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - CORE_PEER_ID=peer1.org1.villalabs.co
+      - CORE_LOGGING_PEER=info
+      - CORE_CHAINCODE_LOGGING=debug
+      - CORE_PEER_LOCALMSPID=Org1MSP
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/msp/peer/
+      - CORE_PEER_ADDRESS=peer1.org1.villalabs.co:7051
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=network_sampleNetwork
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric
+    command: peer node start
+    ports:
+      - 8051:7051
+      - 8053:7053
+    volumes:
+      - /var/run/:/host/var/run/
+      - ./crypto-config/peerOrganizations/org1.villalabs.co/peers/peer1.org1.villalabs.co/msp:/etc/hyperledger/msp/peer
+      - ./crypto-config/peerOrganizations/org1.villalabs.co/users:/etc/hyperledger/msp/users
+      - ./channel-artifacts:/etc/hyperledger/configtx
+    depends_on:
+      - orderer.villalabs.co
+    networks:
+      - sampleNetwork
+\end{lstlisting}
+
+Altere também o arquivo \textit{crypto-config.yaml} para aumentar o números de \textit{peer's}.
+\begin{lstlisting}
+  Template:
+    Count: 2
+\end{lstlisting}
+
+Usando o binário \textit{cryptogen} para extender nossa rede e adicionar o novo peer.
+\begin{lstlisting}
+# Realiza a geração da cadeia de certificados para o novo peer
+$ cryptogen extend --config=./crypto-config.yaml
+
+# Verifique novo peer adicionado
+$ ls -l ./crypto-config/peerOrganizations/org1.villalabs.co/peers/
+\end{lstlisting}
+
+Saída do comando:
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=1.1\textwidth]{imagens/output-cryptogen-extend.png}
+  \caption{Peer's existentes}
+\end{figure}
+
+Usando o binário \textit{configtxgen} para atualizar nossa rede e permitir adicionar o \textit{peer1}.
+\begin{lstlisting}
+# Vamos gerar nosso genesis block
+$ configtxgen -profile OrgsOrdererGenesis -outputBlock ./channel-artifacts/genesis.block
+\end{lstlisting}
+
+Tudo pronto, vamos iniciar os contêineres:
+\begin{lstlisting}
+# Vamos iniciar os containers
+$ docker-compose -f docker-compose.yaml up \
+  -d peer0.org1.villalabs.co peer1.org1.villalabs.co cli
+
+# Visualize os contêineres com filtro ``name=peer``
+$ docker ps --filter name=peer --format "table {{.ID}}\t{{.Image}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}"
+\end{lstlisting}
+
+Saída do comando:
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=1.1\textwidth]{imagens/conteineres-2.png}
+  \caption{Contêineres peer's}
+\end{figure}
+
+Agora vamos unir o canal criado no item \textbf{2.2 Criando sua primeira rede Blockchain} ao novo \textit{peer} que acabamos de adicionar.
+\begin{lstlisting}
+# Primeiro vamos fazer um fetch do genesis block para o corrente channel
+$ docker exec \
+    -e "CORE_PEER_LOCALMSPID=Org1MSP" \
+    -e "CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/msp/users/Admin@org1.villalabs.co/msp" peer1.org1.villalabs.co \
+    peer channel fetch oldest $CHANNEL_NAME.block -c $CHANNEL_NAME \
+    --orderer orderer.villalabs.co:7050
+\end{lstlisting}
+
+Saída do comando:
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=1.1\textwidth]{imagens/output-org1-peer1-fetch.png}
+  \caption{Saída do comando peer channel fetch}
+\end{figure}
+
+\begin{lstlisting}
+# Segundo, vamos executar um join
+$ docker exec \
+    -e "CORE_PEER_LOCALMSPID=Org1MSP" \
+    -e "CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/msp/users/Admin@org1.villalabs.co/msp" peer1.org1.villalabs.co \
+    peer channel join -b $CHANNEL_NAME.block
+\end{lstlisting}
+
+Saída do comando:
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=1.1\textwidth]{imagens/output-org1-peer1-join.png}
+  \caption{Saída do comando peer channel join}
+\end{figure}
+
+Que tal usar o comando \textit{peer channel list} para verificar o canal recém criado.
+\begin{lstlisting}
+# Verificar o canal
+$ docker exec \
+    -e "CORE_PEER_LOCALMSPID=Org1MSP" \
+    -e "CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/msp/users/Admin@org1.villalabs.co/msp" peer1.org1.villalabs.co \
+    peer channel list
+\end{lstlisting}
+
+Saída do comando:
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=1.1\textwidth]{imagens/output-org1-peer1-list.png}
+  \caption{Saída do comando peer channel list}
+\end{figure}
+
+\subsection{Usando CouchDB como banco de estado}
+Por padrão o Hyperledger\cite{hyperledger} Fabric\cite{hyperledgerfabric} usa como banco de dados de estado o LevelDB, nesta seção iremos apresentar como configurar o CouchDB como nosso banco de dados de estado nos \texttt{peer's} de nossa rede.
+
+Todo \textit{peer} na rede deve possuir uma cópia do \textit{ledger} e um \textit{state database} própio. Novamente vamos alterar o arquivo \textit{docker-compose.yaml} (O arquivo completo pode ser encontrado no endereço https://github.com/deusimarferreira/hyperledger-fabric/blob/feature/lab-3/docker-compose.yaml) para alterar e incluir as configurações necessárias.
+
+Adicione as variáveis de ambiente nas configurações dos \textit{peer's} (\textit{peer0} e \textit{peer1}).
+\begin{lstlisting}
+# Peer0
+CORE\_LEDGER\_STATE\_STATEDATABASE=CouchDB
+CORE\_LEDGER\_STATE\_COUCHDBCONFIG\_COUCHDBADDRESS=couchdb.peer0.org1.villalabs.co:5984
+CORE\_LEDGER\_STATE\_COUCHDBCONFIG\_USERNAME=peer0.org1
+CORE\_LEDGER\_STATE\_COUCHDBCONFIG\_PASSWORD=password
+
+# Peer1
+CORE\_LEDGER\_STATE\_STATEDATABASE=CouchDB
+CORE\_LEDGER\_STATE\_COUCHDBCONFIG\_COUCHDBADDRESS=couchdb.peer1.org1.villalabs.co:5984
+CORE\_LEDGER\_STATE\_COUCHDBCONFIG\_USERNAME=peer1.org1
+CORE\_LEDGER\_STATE\_COUCHDBCONFIG\_PASSWORD=password
+\end{lstlisting}
+
+\textbf{services:} - Nos services vamos adicionar as configuração dos dois bancos de estado:
+\begin{lstlisting}
+  couchdb.peer0.org1.villalabs.co:
+    container_name: couchdb.peer0.org1.villalabs.co
+    environment:
+      - COUCHDB_USER=peer0.org1
+      - COUCHDB_PASSWORD=password
+    image: hyperledger/fabric-couchdb
+    ports: 
+      - 5984:5984
+    networks: 
+      - sampleNetwork
+
+  couchdb.peer1.org1.villalabs.co:
+    container_name: couchdb.peer1.org1.villalabs.co
+    environment:
+      - COUCHDB_USER=peer1.org1
+      - COUCHDB_PASSWORD=password
+    image: hyperledger/fabric-couchdb
+    ports: 
+      - 6984:5984
+    networks: 
+      - sampleNetwork
+\end{lstlisting}
+
+Tudo pronto, vamos iniciar os contêineres:
+\begin{lstlisting}
+$ docker-compose -f docker-compose.yaml up \
+  -d ca.villalabs.co orderer.villalabs.co \
+  couchdb.peer0.org1.villalabs.co peer0.org1.villalabs.co \
+  couchdb.peer1.org1.villalabs.co peer1.org1.villalabs.co \
+  cli
+
+# Visualize os contêineres
+$ docker ps --format "table {{.ID}}\t{{.Image}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}"
+\end{lstlisting}
+
+Saída do comando:
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=1.1\textwidth]{imagens/conteineres-3.png}
+  \caption{Contêineres}
+\end{figure}
+
+Use o comando \textit{curl} para testar as bases CouchDB:
+\begin{lstlisting}
+# Testar CouchBD
+$ curl http://localhost:5984
+$ curl http://localhost:6984
+\end{lstlisting}
+
+Como mudamos de base de dados iremos precisar atualizar os \textit{peer's}.
 
 \section{Conclusão}
 Ne artigo tivemos a oportunidade de conhecer um pouco mais sobre a tecnologia Blockchain e ainda criar uma rede na prática usando a ferramenta Hyperledger\cite{hyperledger} Fabric\cite{hyperledgerfabric}. 
